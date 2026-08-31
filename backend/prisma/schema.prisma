@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trip {
+  id              String             @id @default(uuid())
+  threadId        String             @unique
+  title           String?
+  destination     String?
+  budget          Float?
+  startDate       DateTime?
+  endDate         DateTime?
+  itineraryNotes  String?
+  /// Latest resolved planning poll JSON: pollKind, optionIndex, label, decidedAt, source
+  finalPlanningPick Json?
+  /// Set when the 24h attendance reminder was sent (at most once).
+  attendanceNudgeSentAt DateTime?
+  createdBy       String?
+  currentState    TripState          @default(INIT)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  participants    Participant[]
+  expenses        Expense[]
+  messages        MessageContext[]
+  settlements     SettlementRecord[]
+  splitPayments   SplitPayment[]
+}
+
+model Participant {
+  id              String             @id @default(uuid())
+  tripId          String
+  userId          String
+  phoneNumber     String?
+  name            String?
+  subgroupTag     String?
+  status          ParticipantStatus  @default(PENDING)
+  arrivalNote     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  trip            Trip               @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@unique([tripId, userId])
+}
+
+model Expense {
+  id              String         @id @default(uuid())
+  tripId          String
+  paidByUserId    String
+  amount          Float
+  description     String
+  isSubgroup      Boolean        @default(false)
+  subgroupLabel   String?
+  receiptUrl      String?
+  createdAt       DateTime       @default(now())
+  trip            Trip           @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  splits          ExpenseSplit[]
+}
+
+model ExpenseSplit {
+  id              String      @id @default(uuid())
+  expenseId       String
+  userId          String
+  shareAmount     Float
+  /// Cumulative amount paid toward this share (partial payments allowed).
+  paidAmount      Float       @default(0)
+  settled         Boolean     @default(false)
+  settledAt       DateTime?
+  expense         Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  paymentAllocations SplitPaymentAllocation[]
+}
+
+/// Audit trail: one payment event (partial or full) applied across one or more split lines.
+model SplitPayment {
+  id              String       @id @default(uuid())
+  tripId          String
+  payerUserId     String
+  totalAmount     Float
+  note            String?
+  /// chat_partial | reaction_full
+  source          String       @default("chat_partial")
+  createdAt       DateTime     @default(now())
+  trip            Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  allocations     SplitPaymentAllocation[]
+}
+
+model SplitPaymentAllocation {
+  id               String       @id @default(uuid())
+  splitPaymentId   String
+  expenseSplitId   String
+  amount           Float
+  splitPayment     SplitPayment @relation(fields: [splitPaymentId], references: [id], onDelete: Cascade)
+  expenseSplit     ExpenseSplit @relation(fields: [expenseSplitId], references: [id], onDelete: Cascade)
+}
+
+model SettlementRecord {
+  id              String      @id @default(uuid())
+  tripId          String
+  fromUserId      String
+  toUserId        String
+  amount          Float
+  settled         Boolean     @default(false)
+  notedAt         DateTime    @default(now())
+  trip            Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+}
+
+model ProcessedEvent {
+  eventId         String      @id
+  createdAt       DateTime    @default(now())
+}
+
+model MessageContext {
+  messageId       String      @id
+  tripId          String
+  actionType      MessageAction
+  payload         String?
+  createdAt       DateTime    @default(now())
+  trip            Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+}
+
+enum TripState {
+  INIT
+  ATTENDANCE
+  PLANNING
+  ITINERARY
+  ACTIVE
+  SETTLEMENT
+  CLOSED
+}
+
+enum ParticipantStatus {
+  PENDING
+  CONFIRMED
+  DECLINED
+}
+
+enum MessageAction {
+  ATTENDANCE_CONFIRM
+  HOTEL_VOTE
+  PAYMENT_CONFIRM
+  RSVP_POLL
+}

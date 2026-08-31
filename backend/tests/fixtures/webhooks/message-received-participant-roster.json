@@ -1,0 +1,21 @@
+{
+  "event_id": "evt-msg-roster-001",
+  "event_type": "message.received",
+  "data": {
+    "chat_id": "chat-thread-roster",
+    "id": "msg-body-roster",
+    "direction": "inbound",
+    "sender_handle": {
+      "handle": "+14155552671",
+      "is_me": false
+    },
+    "chat": {
+      "id": "chat-thread-roster",
+      "participants": [
+        { "handle": "+14155552671", "name": "Roster Name" },
+        { "handle": "+14155559999", "name": "Someone Else" }
+      ]
+    },
+    "parts": [{ "type": "text", "value": "hello" }]
+  }
+}

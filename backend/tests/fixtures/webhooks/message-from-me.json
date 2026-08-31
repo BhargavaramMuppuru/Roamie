@@ -1,0 +1,18 @@
+{
+  "event_id": "evt-self-001",
+  "type": "message.received",
+  "thread_id": "chat-thread-self",
+  "message": {
+    "id": "msg-self-001",
+    "from_handle": {
+      "handle": "+14155552671",
+      "is_me": true
+    },
+    "parts": [
+      {
+        "type": "text",
+        "value": "Roamie outbound echo"
+      }
+    ]
+  }
+}

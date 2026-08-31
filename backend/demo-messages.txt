@@ -1,0 +1,131 @@
+Phase 1: Trigger behavior + trip creation
+1.1 Show normal group chat is ignored
+* M: Let’s go on a trip?
+* C:  maybe?Vegas
+*B : Cool
+1.2 Trigger Roamie
+* B: Roamie create a trip to Las Vegas from April 20 to April 22 for 3 people with budget $1500
+Phase 2: Name/contact features (Set contact name mapping)
+2.1 Set display name
+* M: Roamie call me Meghana
+2.2 Alternate display name phrasing
+* C: Roamie my name is Chandan
+2.3 Alternate display name phrasing
+* B: This is Bhargav Roamie
+ Phase 3: Attendance flows (text + emoji + arrival note)
+3.1 Create group trip with full details
+3.2 Confirm via text
+* M: Yes
+3.3 Confirm via standalone emoji
+* C: 👍
+3.4 Confirm with arrival note
+* B: Yes, landing on Friday at 8:00 PM
+Phase 4: Hotels + voting + finalize
+4.1 Request hotels
+* B: Roamie, where can we stay? 
+4.2 Vote from all 3 users
+* B: 2
+* M: 1
+* C: 2
+4.3 Finalize by tally
+* B: Roamie finalize poll
+Phase 5: Restaurants + activities + more variants
+5.1 Restaurant request
+* C: Roamie where should we eat in Vegas
+5.2 More restaurants
+* M: Roamie different food options please
+5.3 Vote from all 3 users
+* B: 3
+* M: 3
+* C: 1
+5.4 Finalize by tally
+* B: Roamie finalize poll
+
+
+
+
+5.3 Activities request
+* B: Roamie things to do in Vegas for 3 days
+Phase 6: Meal RSVP poll flow
+6.1 Start RSVP poll
+* B: Roamie dinner Saturday RSVP who is in or out
+6.2 RSVP responses
+* B: in
+* M: yes
+6.3 Emoji RSVP variant
+* C: 👎
+Phase 7: Itinerary + notes + subgroup tags
+7.1 Request itinerary
+* M: Roamie itinerary
+7.2 Append itinerary note (format 1)
+* B: add to itinerary: Bellagio fountains Friday 9 PM
+7.3 Append itinerary note (format 2)
+* C: itinerary note: Red Rock Canyon Saturday 8 AM
+7.4 Tag subgroup
+* M: subgroup: nightlife crew
+Phase 8: Weather
+8.1 Weather request
+* C: Roamie weather in Las Vegas this weekend
+
+ 
+Phase 9: Start trip
+9.1 Start trip intent
+* B: Roamie start the trip
+Phase 10: Expenses — all split types in detail
+10A) Basic equal/group expense
+* B: Roamie $90 dinner at Gordon Ramsay Burger
+10B) Named split (subset of people)
+* M: Roamie $36 uber for Bhargav and Chandan
+10C) Explicit per-person amounts
+* B: Roamie $20 coffee Meghana $8 Chandan $12
+10D) Split with bonus-on-top behavior
+* C: Roamie $30 rideshare split between Bhargav and Meghana and for Meghana +$10
+10E) Another named split natural phrasing
+* M: Roamie $45 brunch split between Bhargav and Chandan
+10F) Subgroup expense
+* M: Roamie $120 club entry subgroup "nightlife crew"
+10G) Receipt parse flow
+* C: Roamie dinner receipt [attach receipt image]
+10H) Voice transcription flow
+* B: Roamie [send voice note: "Add expense forty five dollars for late-night snacks for all"]
+10I) Budget threshold crossing demo
+* B: Roamie $750 hotel deposit
+* C: Roamie $60 parking
+
+ 
+Phase 11: Edit/Delete expense corrections
+11.1 Edit amount by index
+* M: Roamie edit expense 2 amount to $30
+11.2 Edit description by index
+* C: Roamie edit expense 1 description to "Steakhouse group dinner"
+11.3 Delete by index
+* B: Roamie delete expense 3
+11.4 Alternate delete phrasing
+* M: Roamie remove my last expense
+
+Phase 12: Settlement and payment tracking
+12.1 Full settlement summary
+* B: Roamie who owes what
+12.2 Split history
+* M: Roamie split history
+12.3 Personal split view
+* C: Roamie my splits
+12.4 Partial payment
+* M: Roamie paid $20 partial
+12.5 Alternate partial payment phrasing
+* C: Roamie partial $15
+12.6 Mark paid shorthand
+* B: Roamie paid
+
+12.7 Natural paid variants
+* M: venmoed
+* C: zelled
+12.8 Payment reaction shortcut
+* M: [react 👍 on Roamie payment confirmation message]
+
+Phase 13: Close trip + recap
+13.1 Settlement check before close
+* B: Roamie settle up
+13.2 Close trip
+* M: Roamie close trip
+

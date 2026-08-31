@@ -1,0 +1,19 @@
+{
+  "event_id": "evt-msg-001",
+  "event_type": "message.received",
+  "data": {
+    "chat_id": "chat-thread-abc",
+    "id": "msg-body-001",
+    "direction": "inbound",
+    "sender_handle": {
+      "handle": "+14155552671",
+      "is_me": false
+    },
+    "parts": [
+      {
+        "type": "text",
+        "value": "Miami trip May 15 to May 18, 6 people, $1200 budget"
+      }
+    ]
+  }
+}

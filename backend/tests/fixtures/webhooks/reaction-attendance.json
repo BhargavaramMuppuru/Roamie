@@ -1,0 +1,8 @@
+{
+  "id": "evt-react-001",
+  "type": "reaction.added",
+  "thread_id": "chat-thread-abc",
+  "message_id": "msg-tracked-001",
+  "user_id": "+14155552671",
+  "reaction": "👍"
+}

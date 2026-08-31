@@ -1,0 +1,483 @@
+ROAMIE BACKEND - TECHNICAL IMPLEMENTATION DOCUMENT
+Version: 1.0
+Date: 2026-05-05
+
+============================================================
+1) EXECUTIVE TECHNICAL SUMMARY
+============================================================
+Roamie is a TypeScript/Node.js backend that turns chat threads into a full
+group-trip operating system. It combines:
+
+1. Deterministic workflow orchestration (state machine + ledger rules)
+2. AI-assisted understanding/content generation (OpenAI services)
+3. Messaging platform integration (Linq webhook + outbound messaging)
+
+The system supports end-to-end trip lifecycle execution:
+- trip creation
+- attendance confirmation
+- planning (hotels/food/activities)
+- polling and final selection
+- itinerary shaping
+- expense logging and split management
+- partial/full settlement
+- trip closure and memory recap
+
+Core design principle:
+"Deterministic for money/workflow correctness, AI for language flexibility."
+
+
+============================================================
+2) STACK AND INFRASTRUCTURE
+============================================================
+Language/Runtime:
+- TypeScript
+- Node.js
+
+Framework/Libraries:
+- Express (HTTP server + webhook routes)
+- Prisma ORM (database access, schema, migrations)
+- OpenAI SDK (intent parsing, planning content, weather copy, voice, receipt)
+- Zod (runtime environment validation)
+- Axios (external HTTP calls)
+- node-cron (scheduled reminders/automation)
+- Helmet + rate limiting middleware (security)
+
+Testing:
+- Vitest
+- Supertest
+
+Build/Dev:
+- tsx watch (development runtime)
+- tsc (production build to dist/)
+
+Database:
+- PostgreSQL (via Prisma)
+
+Messaging Platform:
+- Linq inbound webhook event ingestion
+- Linq outbound messaging/create-chat/typing APIs
+
+
+============================================================
+3) HIGH-LEVEL ARCHITECTURE
+============================================================
+Primary request path:
+
+Linq Webhook -> Event normalization -> State machine routing ->
+Intent resolution (rules + AI) -> Domain service execution ->
+DB updates -> Outbound chat response
+
+Key modules:
+- src/controllers/eventController.ts
+- src/services/stateMachine.ts
+- src/services/intentService.ts
+- src/services/ledgerService.ts
+- src/services/settlementService.ts
+- src/services/splitHistoryService.ts
+- src/services/openaiTripContent.ts
+- src/services/tripService.ts
+- src/services/reactionService.ts
+- src/services/receiptParseService.ts
+- src/services/voiceTranscriptionService.ts
+- src/services/weatherService.ts
+
+Data flow style:
+- Event-driven processing for inbound messages/reactions
+- Transactional writes for payment allocation and split updates
+- Recomputed settlement records based on current split state
+
+
+============================================================
+4) DOMAIN MODEL (CONCEPTUAL)
+============================================================
+Important entities and responsibilities:
+
+- Trip:
+  Root lifecycle object for one chat thread (or created group thread).
+  Stores state, destination, dates, budget, and itinerary-related fields.
+
+- Participant:
+  User membership in a trip. Includes RSVP state, display name enrichment,
+  phone mapping, subgroup tag, and arrival notes.
+
+- Expense:
+  A payment event (who paid, how much, what for).
+
+- ExpenseSplit:
+  Per-user liability lines for an expense (shareAmount, paidAmount, settled).
+
+- SplitPayment (+ allocations):
+  Audit trail for partial/full payments across split rows.
+
+- SettlementRecord:
+  Rebuilt net transfer recommendations ("who should pay whom").
+
+- MessageContext:
+  Tracks outbound messages requiring reaction-driven behavior
+  (attendance confirmations, payment confirmations, etc.).
+
+
+============================================================
+5) STATE MACHINE AND LIFECYCLE IMPLEMENTATION
+============================================================
+Trip states:
+- INIT
+- ATTENDANCE
+- PLANNING
+- ITINERARY
+- ACTIVE
+- SETTLEMENT
+- CLOSED
+
+State machine goals:
+1) Ensure predictable business behavior by state.
+2) Allow natural-language flexibility without violating lifecycle invariants.
+3) Route the same intent differently depending on state.
+
+Examples:
+- REQUEST_HOTELS during ATTENDANCE can move trip into PLANNING.
+- START_TRIP transitions toward ACTIVE.
+- REQUEST_SETTLEMENT/paid cues move flow into SETTLEMENT.
+- CLOSE_TRIP finalizes and emits closure summary.
+
+Why this design:
+- Chat interactions are messy and asynchronous.
+- Explicit state boundaries prevent accidental feature misuse.
+- Maintains consistent user experience for group coordination.
+
+
+============================================================
+6) INTENT UNDERSTANDING (HOW IT WORKS)
+============================================================
+Hybrid intent architecture:
+
+Layer A - Rule-based parser:
+- Fast regex/heuristic matching for common intents and shortcuts.
+- Handles robust patterns for:
+  attendance yes/no,
+  weather/hotel/food/activity requests,
+  split history/my splits,
+  mark paid,
+  poll finalize,
+  display name/contact roster,
+  expense line patterns and mutations.
+
+Layer B - OpenAI intent parser:
+- Used for broader natural language coverage and structured extraction.
+- Returns typed intent payload with optional fields.
+
+Fallback strategy:
+- If AI parse fails, system falls back to rules.
+- Unknown intents can produce contextual AI responses.
+
+Why hybrid:
+- Rules are deterministic and low-latency for critical commands.
+- AI handles high language variance and natural phrasing.
+- Combined approach improves reliability + UX.
+
+
+============================================================
+7) GROUP CHAT GATING AND TRIGGER LOGIC
+============================================================
+Default behavior in groups:
+- Messages without "Roamie" are ignored to prevent noisy auto-replies.
+
+Intentional exceptions:
+- Bare poll votes: "1", "2", "3"
+- Attendance quick confirmations/declines in attendance context
+- Attachment/voice-driven processing in active trip contexts
+
+Recent implemented behavior:
+- Mention can appear anywhere in text (not only prefix).
+- Voice/image messages can be processed without saying "Roamie"
+  when trip is active and not closed.
+
+Why:
+- Keeps normal human conversation uninterrupted.
+- Preserves low-friction workflows for voting and media-based inputs.
+
+
+============================================================
+8) ATTENDANCE SYSTEM
+============================================================
+Supported confirmations:
+- yes, I'm in, im in, I am in, count me in
+- standalone thumbs-up emoji
+
+Supported declines:
+- no, out, can't make it, standalone thumbs-down emoji
+
+Enhancements:
+- Arrival note capture from confirmation text.
+- Reaction-based attendance support through tracked messages.
+- Attendance nudges via scheduler.
+
+Important implementation detail:
+- Attendance updates are persisted via participant upsert/update flow
+  and drive downstream planning behavior.
+
+
+============================================================
+9) PLANNING AND CONTENT GENERATION
+============================================================
+Planning features:
+- Hotel suggestions + more hotels
+- Restaurant suggestions + more restaurants
+- Activity suggestions + more activities
+- Itinerary generation
+- Itinerary append notes from chat
+- Subgroup tagging for focused planning
+- Meal RSVP polls with topic extraction
+
+AI module responsibilities:
+- generateItineraryNarrative
+- generateOptionPollFromAi
+- generateHotelAlternativesFromAi
+- extractTripPlanningPatch
+- generateContextualReply
+- generateTripClosureMemoryNarrative
+
+Why:
+- Planning content quality benefits from language generation.
+- Core orchestration and storage remain deterministic.
+
+
+============================================================
+10) POLLS AND GROUP DECISIONING
+============================================================
+Capabilities:
+- Option polls generated from planning context
+- Vote capture via simple reply numbers (1/2/3)
+- Poll finalization:
+  - by tally ("finalize poll")
+  - by explicit lock ("finalize 2")
+- Winner/turnout/tally summary messaging
+
+Implementation notes:
+- Poll services track votes and closure state.
+- State machine intercepts numeric-only messages for rapid voting.
+- Guardrails guide users to correct vote interaction patterns.
+
+
+============================================================
+11) EXPENSE ENGINE AND SPLIT LOGIC
+============================================================
+Expense capture supports:
+- amount-first or description-first patterns
+- named split targets ("for Sam and Jordan")
+- explicit custom amounts ("Sam $7 Jordan $13")
+- split bonuses (extra amount for one participant)
+- subgroup-labeled expenses
+- receipt-assisted expense extraction
+
+Critical payer rule:
+- Payer is excluded from owed split targets.
+- Implemented across equal splits, named splits, subgroup fallback,
+  and settlement/history calculations.
+
+Why:
+- Avoids self-owing math artifacts.
+- Keeps liabilities aligned with real reimbursement expectations.
+
+
+============================================================
+12) RECEIPT AND VOICE INPUT PIPELINE
+============================================================
+Receipt parsing:
+- Triggered by image attachments when enabled.
+- Best-effort extraction of amount + merchant cues.
+- Can promote UNKNOWN intent into ADD_EXPENSE.
+
+Voice parsing:
+- Audio attachment URL transcribed via OpenAI transcription model.
+- Transcript merged into inbound text for normal intent flow.
+
+Recent UX upgrade:
+- No mandatory "Roamie" keyword for voice/image in trip context.
+
+Why:
+- Media inputs are common in real group travel operations.
+- Eliminates friction for expense logging in the field.
+
+
+============================================================
+13) BUDGET TRACKING
+============================================================
+Budget features:
+- Trip budget captured at creation/update.
+- Expense follow-up includes budget pulse (spent vs budget).
+- Threshold crossing warning (default via BUDGET_WARNING_PERCENT).
+- Over-budget messaging.
+- Scheduler-driven reminders for budget status.
+
+Why:
+- Continuous budget visibility reduces end-of-trip surprises.
+
+
+============================================================
+14) SETTLEMENT, PAYMENTS, AND HISTORY
+============================================================
+Settlement:
+- Rebuilds net transfer records from outstanding split liabilities.
+- Output: minimal transfer set ("Who should pay whom").
+
+Payment support:
+- Partial payment command parsing and allocation.
+- Mark-paid prompts and reaction shortcut flow.
+- splitPayment audit records retained.
+
+History views:
+- Group split history:
+  expense -> share/paid/still owed + payment events
+- Personal split history:
+  user-specific dues + total outstanding
+
+Correctness safeguards implemented:
+- Ignore payer-self split rows for settlement and history.
+- Settlement netting based on non-self still-owed lines.
+
+Why:
+- Finance paths must be deterministic, auditable, and user-trustworthy.
+
+
+============================================================
+15) NAME/IDENTITY ENRICHMENT
+============================================================
+Implemented features:
+- Self display-name setting ("call me ...", "my name is ...")
+- Contact roster mapping from phone->name pairs
+- Linq participant roster/name hydration and stale refresh
+
+Why:
+- Human-readable settlement and split outputs are essential for group UX.
+
+
+============================================================
+16) REACTIONS AND TRACKED MESSAGE CONTEXT
+============================================================
+Outbound messages can be persisted with context metadata:
+- actionType
+- payload
+- trip association
+
+Reaction service uses this to interpret emoji actions safely:
+- attendance confirmation reactions
+- payment confirmation reactions
+- poll-related reactions/guardrails
+
+Why:
+- Reactions are ambiguous without context.
+- MessageContext ensures deterministic interpretation.
+
+
+============================================================
+17) AUTOMATION AND SCHEDULER
+============================================================
+Scheduled operations include:
+- attendance nudges
+- settlement reminders
+- budget reminders/pulses
+
+Why:
+- Group trips need follow-through even without active prompting.
+
+
+============================================================
+18) SECURITY, VALIDATION, AND OBSERVABILITY
+============================================================
+Security:
+- Helmet hardening
+- Rate limit on webhook ingress
+- Optional webhook secret verification
+- Trust proxy support for deployed environments
+
+Validation:
+- Strict environment schema with Zod
+- Type-safe intent and domain operations
+
+Observability:
+- Structured logging with level controls
+- Debug-level webhook event traces
+- Warnings for AI/API fallback paths
+
+
+============================================================
+19) TESTING AND QUALITY
+============================================================
+Coverage areas include:
+- intent rule behavior
+- webhook route/security
+- event normalization
+- split and ledger behavior
+- weather/service utilities
+- integration-style handler tests
+
+Testing objective:
+- Protect deterministic core paths first
+- Prevent regressions in finance/state transitions
+
+
+============================================================
+20) ENVIRONMENT CONFIGURATION (KEY IMPLEMENTATION FLAGS)
+============================================================
+Required core:
+- DATABASE_URL
+- LINQ_API_TOKEN
+- LINQ_API_BASE_URL
+- LINQ_FROM_PHONE
+- OPENAI_API_KEY
+
+Behavior flags:
+- RECEIPT_PARSE_ENABLED
+- VOICE_PARSE_ENABLED
+- OPENAI_MODEL / OPENAI_VISION_MODEL / OPENAI_TRANSCRIPTION_MODEL
+- BUDGET_WARNING_PERCENT
+- WEBHOOK_RATE_LIMIT_PER_MINUTE
+- LINQ_MIN_MS_BETWEEN_SENDS
+
+
+============================================================
+21) RECENT MAJOR IMPLEMENTATION IMPROVEMENTS
+============================================================
+Recent enhancements delivered:
+- Mention detection works anywhere in message content.
+- Fast-path gate to skip unnecessary heavy processing.
+- Attendance parser improved for "I am in" style phrasing.
+- CREATE_GROUP_TRIP fallback behavior improved when invitees absent.
+- Payer exclusion enforced in split generation.
+- Legacy self-split rows ignored in settlement/history/payments.
+- Voice/image inputs accepted without "Roamie" in active trip context.
+- README and packaging/documentation support for clean distribution.
+
+
+============================================================
+22) WHY THIS ARCHITECTURE IS STRONG
+============================================================
+1) Correctness where it matters:
+   Money, settlement, and state transitions are deterministic.
+
+2) Flexibility where users expect it:
+   AI handles natural language variation and content generation.
+
+3) Chat-native operation:
+   Minimal command burden, reaction shortcuts, media support.
+
+4) Production-minded controls:
+   validation, rate limits, logs, idempotent patterns, scheduled nudges.
+
+5) Evolvable service boundaries:
+   clear modules for intents, state machine, ledger, settlement, and AI.
+
+
+============================================================
+23) FUTURE EXTENSIONS (NATURAL NEXT STEPS)
+============================================================
+- Rich analytics dashboard for trip spend/participation
+- Multi-currency split support
+- Automatic payment rail integrations
+- Better poll/reaction UI affordances per channel
+- Enhanced migration utility to clean historical split anomalies
+- Stronger contract tests for Linq webhook versions
+
+
+END OF DOCUMENT

@@ -1,0 +1,13 @@
+{
+  "id": "evt-react-like-001",
+  "event_type": "reaction",
+  "thread_id": "chat-thread-abc",
+  "data": {
+    "message_id": "msg-tracked-002",
+    "reaction_type": "like",
+    "sender_handle": {
+      "handle": "+14155552671",
+      "is_me": false
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "event_id": "evt-msg-name-001",
+  "event_type": "message.received",
+  "data": {
+    "chat_id": "chat-thread-abc",
+    "id": "msg-body-name",
+    "direction": "inbound",
+    "sender_handle": {
+      "handle": "+14155552671",
+      "name": "Jordan Lee",
+      "is_me": false
+    },
+    "parts": [{ "type": "text", "value": "yes I'm in" }]
+  }
+}
